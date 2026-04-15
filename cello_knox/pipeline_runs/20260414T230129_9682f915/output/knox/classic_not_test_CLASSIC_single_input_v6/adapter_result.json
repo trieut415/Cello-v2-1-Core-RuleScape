@@ -1,0 +1,155 @@
+{
+  "run_id": "classic_not_test_CLASSIC_single_input_v6",
+  "requested_top_n": 3,
+  "returned_top_n": 3,
+  "best_score": 1.5052113891172192,
+  "best_selected_gate": "Switch_003",
+  "candidates": [
+    {
+      "rank": 1,
+      "score": 1.5052113891172192,
+      "selected_gate": "Switch_003",
+      "selected_gate_model": "Switch_003_model",
+      "selected_parts": [
+        "design_col_1_2",
+        "design_col_2_3",
+        "design_col_3_5",
+        "design_col_4_1",
+        "design_col_5_11",
+        "design_col_6_3",
+        "design_col_7_1",
+        "design_col_8_3",
+        "design_col_9_2"
+      ],
+      "selected_roles": [
+        "design_col_1",
+        "design_col_2",
+        "design_col_3",
+        "design_col_4",
+        "design_col_5",
+        "design_col_6",
+        "design_col_7",
+        "design_col_8",
+        "design_col_9"
+      ],
+      "input_assignments": [
+        {
+          "net": "in1",
+          "sensor": "CLASSIC_input_sensor"
+        }
+      ],
+      "gate_assignments": [
+        {
+          "node": "Switch_003",
+          "gate_type": "NOT",
+          "selected_gate": "Switch_003",
+          "score": 126027.96222205252
+        }
+      ],
+      "output_assignments": [
+        {
+          "net": "out1",
+          "device": "CLASSIC_output_reporter"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "score": 1.4767009958399917,
+      "selected_gate": "Switch_001",
+      "selected_gate_model": "Switch_001_model",
+      "selected_parts": [
+        "design_col_1_3",
+        "design_col_2_1",
+        "design_col_3_2",
+        "design_col_4_1",
+        "design_col_5_1",
+        "design_col_6_2",
+        "design_col_7_1",
+        "design_col_8_1",
+        "design_col_9_1"
+      ],
+      "selected_roles": [
+        "design_col_1",
+        "design_col_2",
+        "design_col_3",
+        "design_col_4",
+        "design_col_5",
+        "design_col_6",
+        "design_col_7",
+        "design_col_8",
+        "design_col_9"
+      ],
+      "input_assignments": [
+        {
+          "net": "in1",
+          "sensor": "CLASSIC_input_sensor"
+        }
+      ],
+      "gate_assignments": [
+        {
+          "node": "Switch_001",
+          "gate_type": "NOT",
+          "selected_gate": "Switch_001",
+          "score": 133848.30489789663
+        }
+      ],
+      "output_assignments": [
+        {
+          "net": "out1",
+          "device": "CLASSIC_output_reporter"
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "score": 1.4692682285478837,
+      "selected_gate": "Switch_005",
+      "selected_gate_model": "Switch_005_model",
+      "selected_parts": [
+        "design_col_1_2",
+        "design_col_2_3",
+        "design_col_3_3",
+        "design_col_4_2",
+        "design_col_5_10",
+        "design_col_6_1",
+        "design_col_7_1",
+        "design_col_8_3",
+        "design_col_9_1"
+      ],
+      "selected_roles": [
+        "design_col_1",
+        "design_col_2",
+        "design_col_3",
+        "design_col_4",
+        "design_col_5",
+        "design_col_6",
+        "design_col_7",
+        "design_col_8",
+        "design_col_9"
+      ],
+      "input_assignments": [
+        {
+          "net": "in1",
+          "sensor": "CLASSIC_input_sensor"
+        }
+      ],
+      "gate_assignments": [
+        {
+          "node": "Switch_005",
+          "gate_type": "NOT",
+          "selected_gate": "Switch_005",
+          "score": 130258.49586284964
+        }
+      ],
+      "output_assignments": [
+        {
+          "net": "out1",
+          "device": "CLASSIC_output_reporter"
+        }
+      ]
+    }
+  ],
+  "cello_output_dir": "/Users/trieutran/knox-hw1/cello_knox/pipeline_runs/20260414T230129_9682f915/output/cello/classic_not_test",
+  "knox_output_dir": "/Users/trieutran/knox-hw1/cello_knox/pipeline_runs/20260414T230129_9682f915/output/knox/classic_not_test_CLASSIC_single_input_v6"
+}

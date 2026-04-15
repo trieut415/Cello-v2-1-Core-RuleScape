@@ -1,0 +1,82 @@
+[
+  {
+    "collection": "measurement_std",
+    "signal_carrier_units": "AU"
+  },
+  {
+    "collection": "output_devices",
+    "name": "CLASSIC_output_reporter",
+    "model": "CLASSIC_output_reporter_model",
+    "structure": "CLASSIC_output_reporter_structure"
+  },
+  {
+    "collection": "models",
+    "name": "CLASSIC_output_reporter_model",
+    "functions": {
+      "response_function": "linear_response",
+      "input_composition": "linear_input_composition"
+    },
+    "parameters": [
+      {
+        "name": "unit_conversion",
+        "value": 1.0
+      }
+    ]
+  },
+  {
+    "collection": "structures",
+    "name": "CLASSIC_output_reporter_structure",
+    "inputs": [
+      {
+        "name": "in1",
+        "part_type": "promoter"
+      }
+    ],
+    "devices": [
+      {
+        "name": "CLASSIC_output_reporter",
+        "components": [
+          "#in1",
+          "YFP_cassette"
+        ]
+      }
+    ]
+  },
+  {
+    "collection": "parts",
+    "type": "cassette",
+    "name": "YFP_cassette",
+    "dnasequence": "CTGAAGCTGTCACCGGATGTGCTTTCCGGTCTGATGAGTCCGTGAGGACGAAACAGCCTCTACAAATAATTTTGTTTAATACTAGAGAAAGAGGGGAAATACTAGATGGTGAGCAAGGGCGAGGAGCTGTTCACCGGGGTGGTGCCCATCCTGGTCGAGCTGGACGGCGACGTAAACGGCCACAAGTTCAGCGTGTCCGGCGAGGGCGAGGGCGATGCCACCTACGGCAAGCTGACCCTGAAGTTCATCTGCACCACAGGCAAGCTGCCCGTGCCCTGGCCCACCCTCGTGACCACCTTCGGCTACGGCCTGCAATGCTTCGCCCGCTACCCCGACCACATGAAGCTGCACGACTTCTTCAAGTCCGCCATGCCCGAAGGCTACGTCCAGGAGCGCACCATCTTCTTCAAGGACGACGGCAACTACAAGACCCGCGCCGAGGTGAAGTTCGAGGGCGACACCCTGGTGAACCGCATCGAGCTGAAGGGCATCGACTTCAAGGAGGACGGCAACATCCTGGGGCACAAGCTGGAGTACAACTACAACAGCCACAACGTCTATATCATGGCCGACAAGCAGAAGAACGGCATCAAGGTGAACTTCAAGATCCGCCACAACATCGAGGACGGCAGCGTGCAGCTCGCCGACCACTACCAGCAGAACACCCCAATCGGCGACGGCCCCGTGCTGCTGCCCGACAACCACTACCTTAGCTACCAGTCCGCCCTGAGCAAAGACCCCAACGAGAAGCGCGATCACATGGTCCTGCTGGAGTTCGTGACCGCCGCCGGGATCACTCTCGGCATGGACGAGCTGTACAAGTAACTCGGTACCAAATTCCAGAAAAGAGGCCTCCCGAAAGGGGGGCCTTTTTTCGTTTTGGTCC"
+  },
+  {
+    "collection": "functions",
+    "name": "linear_response",
+    "equation": "c * x",
+    "variables": [
+      {
+        "name": "x",
+        "map": "#//model/functions/input_composition"
+      }
+    ],
+    "parameters": [
+      {
+        "name": "c",
+        "map": "#//model/parameters/unit_conversion"
+      }
+    ]
+  },
+  {
+    "collection": "functions",
+    "name": "linear_input_composition",
+    "equation": "x"
+  },
+  {
+    "collection": "device_rules",
+    "rules": {
+      "function": "AND",
+      "rules": [
+        "ALL_FORWARD"
+      ]
+    }
+  }
+]

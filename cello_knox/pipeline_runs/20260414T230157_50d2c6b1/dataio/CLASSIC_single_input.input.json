@@ -1,0 +1,61 @@
+[
+  {
+    "collection": "input_sensors",
+    "name": "CLASSIC_input_sensor",
+    "model": "CLASSIC_input_sensor_model",
+    "structure": "CLASSIC_input_sensor_structure"
+  },
+  {
+    "collection": "models",
+    "name": "CLASSIC_input_sensor_model",
+    "functions": {
+      "response_function": "sensor_response"
+    },
+    "parameters": [
+      {
+        "name": "ymax",
+        "value": 61385.56129435825,
+        "description": "Dataset-derived high-state promoter activity"
+      },
+      {
+        "name": "ymin",
+        "value": 334.0035554955985,
+        "description": "Dataset-derived low-state promoter activity"
+      }
+    ]
+  },
+  {
+    "collection": "structures",
+    "name": "CLASSIC_input_sensor_structure",
+    "outputs": [
+      "CLASSIC_input_promoter"
+    ]
+  },
+  {
+    "collection": "input_devices",
+    "name": "CLASSIC_input_device",
+    "promoter": "CLASSIC_input_promoter",
+    "sensor": "CLASSIC_input_sensor"
+  },
+  {
+    "collection": "functions",
+    "name": "sensor_response",
+    "equation": "$STATE * (ymax - ymin) + ymin",
+    "parameters": [
+      {
+        "name": "ymax",
+        "map": "#//model/parameters/ymax"
+      },
+      {
+        "name": "ymin",
+        "map": "#//model/parameters/ymin"
+      }
+    ]
+  },
+  {
+    "collection": "parts",
+    "type": "promoter",
+    "name": "CLASSIC_input_promoter",
+    "dnasequence": ""
+  }
+]

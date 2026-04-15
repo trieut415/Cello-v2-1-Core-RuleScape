@@ -1,0 +1,55 @@
+{
+  "creator": "Yosys 0.63 (git sha1 70a11c6bf0e8dd669f56c7da3587f78b405138e2, clang++ 17.0.0 -fPIC -O3)",
+  "modules": {
+    "classic_not_test": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "/Users/trieutran/knox-hw1/cello_knox/pipeline_runs/20260414T230157_50d2c6b1/dataio/classic_not_test.v:1.1-6.10"
+      },
+      "ports": {
+        "in1": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "out1": {
+          "direction": "output",
+          "bits": [ 3 ]
+        }
+      },
+      "cells": {
+        "$abc$78$auto$blifparse.cc:397:parse_blif$79": {
+          "hide_name": 1,
+          "type": "$_NOT_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 2 ],
+            "Y": [ 3 ]
+          }
+        }
+      },
+      "netnames": {
+        "in1": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "/Users/trieutran/knox-hw1/cello_knox/pipeline_runs/20260414T230157_50d2c6b1/dataio/classic_not_test.v:2.11-2.14"
+          }
+        },
+        "out1": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "/Users/trieutran/knox-hw1/cello_knox/pipeline_runs/20260414T230157_50d2c6b1/dataio/classic_not_test.v:3.12-3.16"
+          }
+        }
+      }
+    }
+  }
+}
