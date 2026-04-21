@@ -72,18 +72,14 @@ def permute_count_helper(i_netlist, o_netlist, g_netlist, i_ucf, o_ucf, g_ucf):
     :param g_ucf:
     :return:
     """
-    # print("i_netlist, o_netlist, g_netlist, i_ucf, o_ucf, g_ucf")
-    # print((i_netlist, o_netlist, g_netlist, i_ucf, o_ucf, g_ucf))
-    factorial = lambda n: 1 if n == 0 else n * factorial(n - 1)
-    partial_factorial = lambda n, k: 1 if n <= k else n * partial_factorial(n - 1, k)
-    # check it thrice
-    total_permutations = partial_factorial(i_ucf, i_ucf - i_netlist) * \
-                         partial_factorial(g_ucf, g_ucf - g_netlist) * \
-                         partial_factorial(o_ucf, o_ucf - o_netlist)
-    confirm_permutations = (factorial(i_ucf) / factorial(i_ucf - i_netlist)) * (
-            factorial(o_ucf) / factorial(o_ucf - o_netlist)) * (factorial(g_ucf) / factorial(g_ucf - g_netlist))
-    confirm_permutations2 = math.perm(i_ucf, i_netlist) * math.perm(o_ucf, o_netlist) * math.perm(g_ucf, g_netlist)
-    return total_permutations, (confirm_permutations + confirm_permutations2) / 2
+    # Use Python's built-in permutation helper instead of recursive factorials so
+    # large UCF libraries do not overflow the interpreter recursion limit.
+    total_permutations = (
+        math.perm(i_ucf, i_netlist)
+        * math.perm(g_ucf, g_netlist)
+        * math.perm(o_ucf, o_netlist)
+    )
+    return total_permutations, total_permutations
 
 
 def query_helper(dict_list, key, vals):
