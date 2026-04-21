@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from classic_single_input_adapter import run_pipeline
+from classic_single_input_adapter import normalize_search_mode, run_pipeline
 
 
 SERVER_ROOT = Path(__file__).resolve().parent
@@ -214,6 +214,7 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                 ) = stage_path_inputs(payload, run_root)
                 top_n = int(payload.get("topN", payload.get("top_n", 1)))
                 iterations = int(payload.get("iterations", 25))
+                search_mode = normalize_search_mode(payload.get("search", payload.get("searchMode")))
                 verbose = json_bool(payload.get("verbose"), default=False)
             elif content_type.startswith("multipart/form-data"):
                 content_length = int(self.headers.get("Content-Length", "0"))
@@ -228,6 +229,7 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                 ) = stage_form_inputs(form, run_root)
                 top_n = int(first_present(form, ("topN", "top_n")) or 1)
                 iterations = int(first_present(form, ("iterations",)) or 25)
+                search_mode = normalize_search_mode(first_present(form, ("search", "searchMode")))
                 verbose = json_bool(first_present(form, ("verbose",)), default=False)
             else:
                 raise ValueError("Unsupported Content-Type. Use application/json or multipart/form-data.")
@@ -241,6 +243,7 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                 output_name=output_name,
                 iterations=iterations,
                 top_n=top_n,
+                search_mode=search_mode,
                 verbose=verbose,
             )
 
@@ -254,6 +257,7 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                     "requestedTopN": result.requested_top_n,
                     "returnedTopN": len(result.candidates),
                     "bestScore": result.candidates[0].score,
+                    "searchMode": result.search_mode,
                     "dataioRoot": str(dataio_root),
                     "celloOutputDir": str(result.cello_output_dir),
                     "knoxOutputDir": str(result.knox_output_dir),

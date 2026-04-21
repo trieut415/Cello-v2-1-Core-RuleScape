@@ -21,6 +21,10 @@ __pycache__/
 logs/
 temp_out/
 
+# Generated pipeline output directories
+# - cello_knox/classic_single_input/output/ is ignored by its own nested .gitignore
+# - cello_knox/pipeline_runs/ is ignored by its own nested .gitignore
+
 # Misc
 assets/Papers
 assets/Slides

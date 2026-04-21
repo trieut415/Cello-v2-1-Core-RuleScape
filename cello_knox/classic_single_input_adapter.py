@@ -17,6 +17,14 @@ DEFAULT_UCF = "CLASSIC_single_input_v6.UCF"
 DEFAULT_INPUT = "CLASSIC_single_input.input"
 DEFAULT_OUTPUT = "CLASSIC_single_input.output"
 DEFAULT_VERILOG = "classic_not_test"
+DEFAULT_SEARCH = "exhaustive"
+
+
+def normalize_search_mode(value: str | None) -> str:
+    normalized = str(value or DEFAULT_SEARCH).strip().lower()
+    if normalized in {"exhaustive", "annealing"}:
+        return normalized
+    raise ValueError(f"Unsupported search mode: {value}")
 
 
 @dataclass(frozen=True)
@@ -39,6 +47,7 @@ class AdapterResult:
     part_library_rows: tuple[tuple[str, ...], ...]
     cello_output_dir: Path
     knox_output_dir: Path
+    search_mode: str
 
 
 def ensure_cello_imports() -> None:
@@ -57,36 +66,46 @@ def ensure_cello_imports() -> None:
             sys.modules[module_name] = module
 
     if "scipy" not in sys.modules:
-        scipy_shim = types.ModuleType("scipy")
-        optimize_shim = types.ModuleType("scipy.optimize")
+        try:
+            import scipy  # noqa: F401
+            import scipy.optimize  # noqa: F401
+        except ImportError:
+            scipy_shim = types.ModuleType("scipy")
+            optimize_shim = types.ModuleType("scipy.optimize")
 
-        class Bounds:
-            def __init__(self, *args, **kwargs):
-                self.args = args
-                self.kwargs = kwargs
+            class Bounds:
+                def __init__(self, *args, **kwargs):
+                    self.args = args
+                    self.kwargs = kwargs
 
-        def dual_annealing(*args, **kwargs):
-            raise RuntimeError("dual_annealing is unavailable in this adapter runtime")
+            def dual_annealing(*args, **kwargs):
+                raise RuntimeError(
+                    "dual_annealing is unavailable in this adapter runtime. "
+                    "Install scipy in the same Python environment that runs pipeline_server.py"
+                )
 
-        optimize_shim.Bounds = Bounds
-        optimize_shim.dual_annealing = dual_annealing
-        scipy_shim.optimize = optimize_shim
-        sys.modules["scipy"] = scipy_shim
-        sys.modules["scipy.optimize"] = optimize_shim
+            optimize_shim.Bounds = Bounds
+            optimize_shim.dual_annealing = dual_annealing
+            scipy_shim.optimize = optimize_shim
+            sys.modules["scipy"] = scipy_shim
+            sys.modules["scipy.optimize"] = optimize_shim
 
     if "threadpoolctl" not in sys.modules:
-        shim = types.ModuleType("threadpoolctl")
+        try:
+            import threadpoolctl  # noqa: F401
+        except ImportError:
+            shim = types.ModuleType("threadpoolctl")
 
-        @contextmanager
-        def threadpool_limits(*args, **kwargs):
-            yield
+            @contextmanager
+            def threadpool_limits(*args, **kwargs):
+                yield
 
-        def threadpool_info():
-            return [{"num_threads": 1}]
+            def threadpool_info():
+                return [{"num_threads": 1}]
 
-        shim.threadpool_limits = threadpool_limits
-        shim.threadpool_info = threadpool_info
-        sys.modules["threadpoolctl"] = shim
+            shim.threadpool_limits = threadpool_limits
+            shim.threadpool_info = threadpool_info
+            sys.modules["threadpoolctl"] = shim
 
     cello_path = str(CELLO_ROOT)
     if cello_path not in sys.path:
@@ -163,6 +182,7 @@ def build_runner(
     input_root: Path,
     cello_output_root: Path,
     iterations: int,
+    search_mode: str,
     verbose: bool,
 ):
     ensure_cello_imports()
@@ -181,7 +201,7 @@ def build_runner(
     runner = CELLO3.__new__(CELLO3)
     runner.verbose = verbose
     runner.print_iters = False
-    runner.exhaustive = True
+    runner.exhaustive = normalize_search_mode(search_mode) == "exhaustive"
     runner.test_configs = False
     runner.log_overwrite = True
     runner.total_iters = iterations
@@ -376,7 +396,7 @@ def select_top_candidates(runner, best_result, top_n: int) -> tuple[CandidateRes
     return ranked
 
 
-def run_cello_scoring_only(
+def prepare_cello_runner(
     input_root: Path,
     output_root: Path,
     verilog_name: str,
@@ -384,6 +404,7 @@ def run_cello_scoring_only(
     input_name: str,
     output_name: str,
     iterations: int,
+    search_mode: str,
     verbose: bool,
 ):
     ensure_cello_imports()
@@ -402,6 +423,7 @@ def run_cello_scoring_only(
         input_root=input_root,
         cello_output_root=output_root,
         iterations=iterations,
+        search_mode=search_mode,
         verbose=verbose,
     )
 
@@ -420,6 +442,35 @@ def run_cello_scoring_only(
     if not valid:
         raise RuntimeError("CLASSIC inputs are not compatible with the generated netlist")
 
+    return runner, max_iterations
+
+
+def run_cello_scoring_only(
+    input_root: Path,
+    output_root: Path,
+    verilog_name: str,
+    ucf_name: str,
+    input_name: str,
+    output_name: str,
+    iterations: int,
+    search_mode: str,
+    verbose: bool,
+):
+    ensure_cello_imports()
+    from core_algorithm.celloAlgo import CELLO3
+
+    runner, max_iterations = prepare_cello_runner(
+        input_root=input_root,
+        output_root=output_root,
+        verilog_name=verilog_name,
+        ucf_name=ucf_name,
+        input_name=input_name,
+        output_name=output_name,
+        iterations=iterations,
+        search_mode=search_mode,
+        verbose=verbose,
+    )
+    enable_candidate_capture(runner)
     best_result = CELLO3.techmap(runner, max_iterations)
     if not best_result:
         raise RuntimeError("Cello did not produce a best assignment")
@@ -436,6 +487,7 @@ def build_adapter_result(runner, best_result, knox_output_dir: Path, requested_t
         part_library_rows=tuple(tuple(row) for row in build_part_library_rows(runner.design_factor_lookup)),
         cello_output_dir=Path(runner.out_path) / runner.verilog_name,
         knox_output_dir=knox_output_dir,
+        search_mode="exhaustive" if runner.exhaustive else "annealing",
     )
 
 
@@ -463,6 +515,7 @@ def write_knox_exports(result: AdapterResult) -> None:
         "returned_top_n": len(result.candidates),
         "best_score": result.candidates[0].score,
         "best_selected_gate": result.candidates[0].selected_gate,
+        "search_mode": result.search_mode,
         "candidates": [
             {
                 "rank": rank,
@@ -531,6 +584,12 @@ def parse_args() -> argparse.Namespace:
         help="Number of top-scoring unique Cello designs to export for Knox",
     )
     parser.add_argument(
+        "--search",
+        choices=["exhaustive", "annealing"],
+        default=DEFAULT_SEARCH,
+        help="Cello gate-assignment search mode",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable Cello's verbose compatibility logging",
@@ -547,6 +606,7 @@ def run_pipeline(
     output_name: str,
     iterations: int,
     top_n: int,
+    search_mode: str,
     verbose: bool,
 ) -> AdapterResult:
     classic_root = classic_root.resolve()
@@ -562,6 +622,7 @@ def run_pipeline(
         input_name=input_name,
         output_name=output_name,
         iterations=iterations,
+        search_mode=search_mode,
         verbose=verbose,
     )
     result = build_adapter_result(runner, best_result, knox_output_dir, top_n)
@@ -580,6 +641,7 @@ def main() -> int:
         output_name=args.output_name,
         iterations=args.iterations,
         top_n=args.top_n,
+        search_mode=args.search,
         verbose=args.verbose,
     )
 

@@ -690,14 +690,22 @@ class CELLO3:
         """
         print_centered('Running EXHAUSTIVE gate-assignment algorithm...')
         log.cf.info('Scoring potential gate assignments...')
+        max_fun = iter_ if iter_ < self.total_iters else self.total_iters
         for I_perm in itertools.permutations(i_list, i):
+            if self.iter_count >= max_fun:
+                break
             for O_perm in itertools.permutations(o_list, o):
+                if self.iter_count >= max_fun:
+                    break
                 for G_perm in itertools.permutations(g_list, g):
+                    if self.iter_count >= max_fun:
+                        break
                     self.prep_assign_for_scoring((I_perm, O_perm, G_perm),
-                                                 (None, None, None, netgraph, i, o, g, iter_))
+                                                 (None, None, None, netgraph, i, o, g, max_fun))
         if not self.verbose:
             log.cf.info('\n')
-        log.cf.info(f'\nDONE!\nCounted: {self.iter_count:,} iterations')
+        log.cf.info(f'\nDONE!\nCompleted: {self.iter_count:,}/{max_fun:,} iterations '
+                    f'(out of {iter_:,} possible iterations)')
 
         return self.best_graphs
 
