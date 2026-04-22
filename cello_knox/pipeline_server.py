@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import math
 import os
 import shutil
 import traceback
@@ -251,6 +252,98 @@ def parse_weight_scores(text: str) -> list[float]:
     return scores
 
 
+def median_score(values: list[float]) -> float:
+    if not values:
+        raise ValueError("Cannot compute a median for an empty score list.")
+
+    sorted_values = sorted(values)
+    count = len(sorted_values)
+    midpoint = count // 2
+
+    if count % 2 == 1:
+        return sorted_values[midpoint]
+    return (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
+
+
+def derive_design_labels(scores: list[float], labeling_method: str) -> list[int]:
+    if labeling_method == "sign":
+        return [1 if score > 0 else 0 for score in scores]
+
+    threshold = median_score(scores)
+    return [1 if score >= threshold else 0 for score in scores]
+
+
+def validate_knox_evaluation_inputs(
+    *,
+    bundle_source: str,
+    design_space_count: int,
+    design_scores: list[float],
+    labeling_method: str,
+) -> None:
+    if design_space_count < 2:
+        raise ValueError("Knox rule evaluation needs at least two imported designs.")
+
+    if bundle_source == "uploaded" and not design_scores:
+        raise ValueError(
+            "Uploaded Knox bundle evaluation requires weight.csv. "
+            "Import-only works without scores, but Evaluate Rules needs explicit design scores."
+        )
+
+    if not design_scores:
+        return
+
+    if len(design_scores) != design_space_count:
+        raise ValueError(
+            f"weight.csv row count ({len(design_scores)}) must match the imported design count ({design_space_count})."
+        )
+
+    if any(not math.isfinite(score) for score in design_scores):
+        raise ValueError("Knox rule evaluation requires finite design scores in weight.csv.")
+
+    labels = derive_design_labels(design_scores, labeling_method)
+    if len(set(labels)) < 2:
+        raise ValueError(
+            "Knox rule evaluation needs at least one good and one poor design after labeling. "
+            "Use more designs, provide more varied scores, or change the labeling method."
+        )
+
+
+def normalize_goldbar_expression(text: str) -> str:
+    normalized = str(text or "").strip()
+    if not normalized:
+        return ""
+
+    csv_text = normalized.lstrip("\ufeff")
+
+    try:
+        reader = csv.DictReader(io.StringIO(csv_text))
+        fieldnames = [field.strip() for field in (reader.fieldnames or []) if field]
+    except csv.Error:
+        return normalized
+
+    goldbar_field = next((field for field in fieldnames if field.lower() == "goldbar"), None)
+    if not goldbar_field:
+        return normalized
+
+    values: list[str] = []
+    for row in reader:
+        if not row:
+            continue
+
+        matching_key = next((key for key in row.keys() if str(key).strip().lower() == "goldbar"), None)
+        if not matching_key:
+            continue
+
+        value = str(row.get(matching_key, "") or "").strip()
+        if value:
+            values.append(value)
+
+    if not values:
+        return ""
+
+    return max(values, key=len)
+
+
 def encode_multipart_formdata(
     fields: list[tuple[str, str]],
     files: list[tuple[str, str, bytes, str]],
@@ -350,6 +443,44 @@ def knox_expect_json(
     )
     text = payload.decode("utf-8").strip()
     return json.loads(text) if text else {}
+
+
+def knox_delete_group_if_present(group_id: str) -> None:
+    if not str(group_id or "").strip():
+        return
+
+    status, payload, _ = knox_request(
+        "/designSpace/deleteGroup",
+        method="DELETE",
+        fields=[("groupID", group_id)],
+    )
+
+    if 200 <= status < 300 or status in {400, 404}:
+        return
+
+    message = payload.decode("utf-8", errors="replace").strip() or (
+        f"Knox delete group failed with status {status}"
+    )
+    raise RuntimeError(message)
+
+
+def knox_delete_rule_evaluation_if_present(evaluation_name: str) -> None:
+    if not str(evaluation_name or "").strip():
+        return
+
+    status, payload, _ = knox_request(
+        "/rule",
+        method="DELETE",
+        fields=[("evaluationName", evaluation_name)],
+    )
+
+    if 200 <= status < 300 or status in {400, 404}:
+        return
+
+    message = payload.decode("utf-8", errors="replace").strip() or (
+        f"Knox delete evaluation failed with status {status}"
+    )
+    raise RuntimeError(message)
 
 
 def normalize_knox_evaluation(raw: dict[str, Any]) -> dict[str, Any]:
@@ -568,6 +699,10 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
         raise ValueError("bundleSource must be 'generated' or 'uploaded'.")
 
     if action == "import":
+        # Knox imports append into an existing group ID. Clear the target group first so
+        # repeated imports with the same UI defaults remain idempotent instead of accumulating.
+        knox_delete_group_if_present(design_group_id)
+
         knox_expect_success(
             "/import/csv",
             method="POST",
@@ -584,7 +719,7 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
     if not design_space_ids:
         raise ValueError(f"No Knox design spaces found for design group '{design_group_id}'. Import the bundle first.")
 
-    goldbar = str(payload.get("goldbar", ""))
+    goldbar = normalize_goldbar_expression(str(payload.get("goldbar", "")))
     categories = str(payload.get("categories", ""))
     design_scores = parse_weight_scores(weight_text)
     evaluation_payload: dict[str, Any] = {
@@ -601,6 +736,18 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
         if not goldbar.strip() or not categories.strip():
             raise ValueError("Goldbar and categories are required to evaluate rules.")
 
+        validate_knox_evaluation_inputs(
+            bundle_source=bundle_source,
+            design_space_count=len(design_space_ids),
+            design_scores=design_scores,
+            labeling_method=labeling_method,
+        )
+
+        # Goldbar imports and stored evaluations also accumulate when the same IDs are reused.
+        # Clear the target rule group and prior evaluation so repeated runs stay isolated.
+        knox_delete_group_if_present(rules_group_id)
+        knox_delete_rule_evaluation_if_present(evaluation_name)
+
         knox_expect_success(
             "/goldbar/import",
             method="POST",
@@ -615,6 +762,11 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
 
         rule_space_ids = knox_expect_json(f"/designSpace/listGroupSpaces?groupID={quote(rules_group_id)}")
         rule_space_ids = [str(space_id) for space_id in (rule_space_ids or [])]
+        if not rule_space_ids:
+            raise ValueError(
+                f"No Knox rule spaces were created for rules group '{rules_group_id}'. "
+                "Check the Goldbar and categories inputs."
+            )
 
         evaluation_fields: list[tuple[str, str]] = [
             ("evaluationName", evaluation_name),
