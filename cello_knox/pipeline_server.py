@@ -104,6 +104,29 @@ def load_summary(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def load_json_file(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def resolve_run_result(request_id: str, service: str) -> Path:
+    normalized_service = str(service or "").strip().lower()
+    if normalized_service not in {"cello", "knox"}:
+        raise ValueError("service must be 'cello' or 'knox'")
+
+    run_root = (RUNS_ROOT / request_id).resolve()
+    if not run_root.exists() or RUNS_ROOT.resolve() not in run_root.parents:
+        raise FileNotFoundError(f"Unknown run: {request_id}")
+
+    result_path = run_root / "output" / f"{normalized_service}_runtime" / f"{normalized_service}_result.json"
+    if not result_path.exists():
+        raise FileNotFoundError(
+            f"Stored {normalized_service} result not found for run {request_id}"
+        )
+
+    return result_path
+
+
 def build_file_preview(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         content = handle.read()
@@ -889,6 +912,24 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                 )
             return
 
+        if parsed.path == "/api/pipeline/result":
+            try:
+                query = parse_qs(parsed.query)
+                request_id = (query.get("requestId") or [""])[0].strip()
+                service = (query.get("service") or [""])[0].strip()
+                if not request_id or not service:
+                    raise ValueError("requestId and service are required")
+
+                payload = load_json_file(resolve_run_result(request_id, service))
+                self.send_json(HTTPStatus.OK, payload)
+                return
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            except FileNotFoundError as exc:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                return
+
         if parsed.path == "/api/pipeline/download":
             try:
                 query = parse_qs(parsed.query)
@@ -975,10 +1016,14 @@ class PipelineRequestHandler(BaseHTTPRequestHandler):
                 verbose=verbose,
             )
 
-            self.send_json(
-                HTTPStatus.OK,
-                build_cello_response_payload(request_id, dataio_root, result, self.headers.get("Host")),
+            response_payload = build_cello_response_payload(
+                request_id,
+                dataio_root,
+                result,
+                self.headers.get("Host"),
             )
+            write_json_file(run_root / "output" / "cello_runtime" / "cello_result.json", response_payload)
+            self.send_json(HTTPStatus.OK, response_payload)
         except ValueError as exc:
             self.send_json(
                 HTTPStatus.BAD_REQUEST,
