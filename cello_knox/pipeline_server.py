@@ -364,7 +364,7 @@ def normalize_goldbar_expression(text: str) -> str:
     if not values:
         return ""
 
-    return max(values, key=len)
+    return "\n".join(dict.fromkeys(values))
 
 
 def encode_multipart_formdata(
@@ -743,6 +743,7 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
         raise ValueError(f"No Knox design spaces found for design group '{design_group_id}'. Import the bundle first.")
 
     goldbar = normalize_goldbar_expression(str(payload.get("goldbar", "")))
+    goldbar_rules = [line.strip() for line in goldbar.splitlines() if line.strip()]
     categories = str(payload.get("categories", ""))
     design_scores = parse_weight_scores(weight_text)
     evaluation_payload: dict[str, Any] = {
@@ -756,7 +757,7 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
     }
 
     if action == "evaluate":
-        if not goldbar.strip() or not categories.strip():
+        if not goldbar_rules or not categories.strip():
             raise ValueError("Goldbar and categories are required to evaluate rules.")
 
         validate_knox_evaluation_inputs(
@@ -771,17 +772,33 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
         knox_delete_group_if_present(rules_group_id)
         knox_delete_rule_evaluation_if_present(evaluation_name)
 
-        knox_expect_success(
-            "/goldbar/import",
-            method="POST",
-            fields=[
-                ("goldbar", goldbar),
-                ("categories", categories),
-                ("outputSpaceID", rule_space_id),
-                ("groupID", rules_group_id),
-                ("verbose", "true" if json_bool(payload.get("verbose"), default=False) else "false"),
-            ],
-        )
+        verbose_flag = "true" if json_bool(payload.get("verbose"), default=False) else "false"
+        imported_rule_space_ids: list[str] = []
+        multiple_rules = len(goldbar_rules) > 1
+        for index, goldbar_rule in enumerate(goldbar_rules, start=1):
+            current_rule_space_id = rule_space_id if not multiple_rules else f"{rule_space_id}_{index:03d}"
+            try:
+                knox_expect_success(
+                    "/goldbar/import",
+                    method="POST",
+                    fields=[
+                        ("goldbar", goldbar_rule),
+                        ("categories", categories),
+                        ("outputSpaceID", current_rule_space_id),
+                        ("groupID", rules_group_id),
+                        ("weight", "0.0"),
+                        ("verbose", verbose_flag),
+                    ],
+                )
+            except RuntimeError as exc:
+                raise RuntimeError(
+                    "Goldbar import failed on "
+                    f"rule {index}/{len(goldbar_rules)} "
+                    f"for outputSpaceID '{current_rule_space_id}'.\n"
+                    f"Rule: {goldbar_rule}\n"
+                    f"Knox response: {exc}"
+                ) from exc
+            imported_rule_space_ids.append(current_rule_space_id)
 
         rule_space_ids = knox_expect_json(f"/designSpace/listGroupSpaces?groupID={quote(rules_group_id)}")
         rule_space_ids = [str(space_id) for space_id in (rule_space_ids or [])]
@@ -815,6 +832,8 @@ def execute_knox_run(payload: dict[str, Any], request_id: str, run_root: Path) -
             "ruleSpaceId": rule_space_id,
             "rulesGroupId": rules_group_id,
             "ruleSpaceIds": rule_space_ids,
+            "requestedRuleCount": len(goldbar_rules),
+            "importedRuleSpaceIds": imported_rule_space_ids,
             "labelingMethod": labeling_method,
             "designScoresProvided": len(design_scores),
             "topRule": top_rule,
